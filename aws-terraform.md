@@ -1,0 +1,1003 @@
+# AWS VPC EC2 Terraform lab
+
+- [AWS VPC EC2 Terraform lab](#aws-vpc-ec2-terraform-lab)
+  - [Objectives](#objectives)
+  - [AWS Web console](#aws-web-console)
+  - [Access Key for Terraform Provider](#access-key-for-terraform-provider)
+  - [Terraform Overview](#terraform-overview)
+    - [What is Infrastructure as Code with Terraform](#what-is-infrastructure-as-code-with-terraform)
+    - [Manage any infrastructure](#manage-any-infrastructure)
+    - [Standardize your deployment workflow](#standardize-your-deployment-workflow)
+    - [Dependency Graph](#dependency-graph)
+    - [Track your infrastructure](#track-your-infrastructure)
+    - [Collaborate](#collaborate)
+  - [Install Terraform on Linux](#install-terraform-on-linux)
+  - [Create a subnet (and your first Terraform script)](#create-a-subnet-and-your-first-terraform-script)
+  - [Let's use variables in Terraform](#lets-use-variables-in-terraform)
+  - [Let's use datasource and output in Terraform](#lets-use-datasource-and-output-in-terraform)
+  - [Create 2x subnets](#create-2x-subnets)
+  - [Create a custom route table](#create-a-custom-route-table)
+  - [Create a security group](#create-a-security-group)
+  - [Create a key pair](#create-a-key-pair)
+  - [Create an EC2 instance](#create-an-ec2-instance)
+  - [Questions](#questions)
+  - [Extra work 1 (bonus)](#extra-work-1-bonus)
+  - [Extra work 2 (bonus)](#extra-work-2-bonus)
+
+---
+
+## Objectives
+
+- understand Infrastructure as Code principles
+- understand Terraform HashiCorp configuration language (HCL) and workflow
+- experiment Terraform with AWS provider
+- understand AWS network concepts and modelisation
+
+---
+
+## AWS Web console
+
+Connect to the AWS console using the credentials provided in the Lab Guide.
+
+![](docs/lab_access.png)
+
+Once connected verify and switch to the lab region : us-east-1
+
+The most convenient way to navigate AWS web console is to use the research bar on the top side and type the name of the service or feature inside a service you'd like to access.
+
+---
+
+## Access Key for Terraform Provider
+
+AWS Identity and Access Management (IAM) is a web service that helps you securely control access to AWS resources. You use IAM to control who is authenticated (signed in) and authorized (has permissions) to use resources. IAM supports the use of access keys to make programmatic calls to AWS from the AWS CLI, AWS SDKs, direct AWS API calls or automation tools like Terraform. You can have a maximum of two access keys (active or inactive) at a time.
+
+For your protection, you should never share your secret keys with anyone. As a best practice, we recommend frequent key rotation.
+
+1. Create Access Key.
+
+   Go to IAM service > Users > podx-gin-208 > Security Credentials
+
+   ![](docs/iam-security-credentials.png)
+
+   Create your access key and download the key pair, choose Download .csv file. Store the keys in a secure location. You will not have access to the secret access key again after this dialog box closes.
+   
+   ![](docs/create-access-key.png)
+
+   The downloaded csv file includes the Access key ID and the Secret access key ids that will be used to configure the Terraform AWS provider.
+
+   ```
+   Access key ID,Secret access key
+   REDACTED,REDACTED
+   ```
+
+---
+
+## Terraform Overview
+
+### What is Infrastructure as Code with Terraform
+
+Infrastructure as code (IaC) tools allow you to manage infrastructure with configuration files rather than through a graphical user interface. IaC allows you to build, change, and manage your infrastructure in a safe, consistent, and repeatable way by defining resource configurations that you can version, reuse, and share.
+
+Terraform is HashiCorp's infrastructure as code tool. It lets you define resources and infrastructure in human-readable, declarative configuration files, and manages your infrastructure's lifecycle. Using Terraform has several advantages over manually managing your infrastructure:
+
+- Terraform can manage infrastructure on multiple cloud platforms.
+- The human-readable configuration language helps you write infrastructure code quickly.
+- Terraform's state allows you to track resource changes throughout your deployments.
+- You can commit your configurations to version control to safely collaborate on infrastructure.
+
+### Manage any infrastructure
+
+Terraform plugins called providers let Terraform interact with cloud platforms and other services via their application programming interfaces (APIs). HashiCorp and the Terraform community have written over 1,000 providers to manage resources on Amazon Web Services (AWS), Azure, Google Cloud Platform (GCP), Kubernetes, Helm, GitHub, Splunk, and DataDog, just to name a few. Find providers for many of the platforms and services you already use in the Terraform Registry (https://registry.terraform.io/browse/providers).
+
+Terraform can manage existing and popular service providers (AWS, GCP, ...) as well as custom in-house solutions (Cisco Intersight, ACI, Kubernetes, VMware, Openstack...).
+
+The infrastructure Terraform can manage includes low-level components such as compute instances, storage, and networking, as well as high-level components such as DNS entries, SaaS features, etc.
+
+The Terraform key features are listed below:
+
+- Infrastructure as Code: Infrastructure is described using a high-level and declarative configuration syntax (HCL: HashiCorp Configuration Language).
+- Execution Plans: Terraform has a "planning" step called execution plan, it shows the changes that will be configured when the plan is applied.
+- Resource Graph: Terraform builds a graph of all your resources, and parallelizes the creation and modification of any non-dependent resources.
+- Change Automation: Terraform keep configuration states (real view of resources configuration) and figure out the changes and in what order to reach the intent.
+
+### Standardize your deployment workflow
+
+Providers define individual units of infrastructure, for example compute instances or private networks, as resources. You can compose resources from different providers into reusable Terraform configurations called modules, and manage them with a consistent language and workflow.
+
+Terraform's configuration language is declarative, meaning that it describes the desired end-state for your infrastructure, in contrast to procedural programming languages that require step-by-step instructions to perform tasks. Terraform providers automatically calculate dependencies between resources to create or destroy them in the correct order.
+
+Terraform workflow includes the following steps:
+
+- terraform init: scan the code, figure out which providers you’re using, and download the code for them.
+- terraform plan: let you see what Terraform will do before actually making any changes
+- terraform apply: to actually create/update/delete the resources
+
+### Dependency Graph
+
+When you add a reference from one resource to another, you create an implicit dependency. Terraform parses these dependencies, builds a dependency graph from them, and uses that to automatically determine in which order it should create resources.
+
+### Track your infrastructure
+
+Terraform keeps track of your real infrastructure in a state file, which acts as a source of truth for your environment. Terraform uses the state file to determine the changes to make to your infrastructure so that it will match your configuration.
+
+Every time you run Terraform, it records information about what infrastructure it created in a Terraform state file. By default, when you run Terraform in the folder /foo/bar, Terraform creates the file /foo/bar/terraform.tfstate. This file contains a custom JSON format that records a mapping from the Terraform resources in your configuration files to the representation of those resources in the real world. 
+
+### Collaborate
+
+Terraform allows you to collaborate on your infrastructure with its remote state backends. When you use Terraform Cloud (free for up to five users), you can securely share your state with your teammates, provide a stable environment for Terraform to run in, and prevent race conditions when multiple people make configuration changes at once.
+
+You can also connect Terraform Cloud to version control systems (VCSs) like GitHub, GitLab, and others, allowing it to automatically propose infrastructure changes when you commit configuration changes to VCS. This lets you manage changes to your infrastructure through version control, as you would with application code.
+
+## Install Terraform on Linux
+
+2. Install Terraform
+
+   ```bash
+   sudo apt-get update && sudo apt-get install -y gnupg software-properties-common curl
+   ```
+
+   Add the HashiCorp GPG key.
+
+   ```bash
+   curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo apt-key add -
+   ```
+
+   Add the official HashiCorp Linux repository.
+
+   ```bash
+   sudo apt-add-repository "deb [arch=amd64] https://apt.releases.hashicorp.com $(lsb_release -cs) main"
+   ```
+
+   Update to add the repository, and install the Terraform CLI.
+
+   ```bash
+   sudo apt-get update && sudo apt-get install terraform
+   ```
+
+3. Verify the installation
+
+   ```bash
+   terraform -help
+   ```
+
+   You should see something similar to:
+
+   ```bash
+   Usage: terraform [global options] <subcommand> [args]
+
+   The available commands for execution are listed below.
+   The primary workflow commands are given first, followed by
+   less common or more advanced commands.
+
+   Main commands: ...
+   ```
+
+---
+
+## Create a subnet (and your first Terraform script)
+
+Create a folder on the Linux machine to host the Terraform script you are going to write for that very first step. Example ```mkdir create-subnet```. In that dedicated folder create a file called ```main.tf```.
+
+4. Define create-subnet main script
+
+   Terraform code is written in the HashiCorp Configuration Language (HCL) in files with the extension .tf. It is a declarative language, so your goal is to describe the infrastructure you want, and Terraform will figure out how to create it. The first step to using Terraform is typically to configure the provider(s) you want to use. Create an empty folder and put a file in it called ```main.tf``` that contains the following contents:
+
+   ```console
+   provider "aws" {
+     region = "us-east-1"
+     access_key = "REDACTED"
+     secret_key = "REDACTED"
+   }
+   ```
+
+   where:
+
+   - ```region``` is the us-east-1 region
+   - ```access_key``` is the access key you have retrieved in step 1.
+   - ```secret_key``` is the secret key you got from step 1.
+
+   For each type of provider, there are many different kinds of resources that you can create, such as servers, databases, and load balancers. The general syntax for creating a resource in Terraform is:
+
+   ```console
+   resource "<PROVIDER>_<TYPE>" "<NAME>" {
+     [CONFIG ...]
+   }
+   ```
+
+   where ```PROVIDER``` is the name of a provider (e.g., aws), ```TYPE``` is the type of resource to create in that provider (e.g., subnet), ```NAME``` is an identifier you can use throughout the Terraform code to refer to this resource (e.g., this), and ```CONFIG``` consists of one or more arguments that are specific to that resource.
+
+   For example, to deploy a subnet in an AWS VPC, use the aws_subnet resource in ```main.tf``` as follows:
+
+   ```console
+   resource "aws_subnet" "this" {
+     vpc_id     = "vpc-REDACTED"
+     cidr_block = "192.168.1.0/24"
+
+     tags = {
+       Name = "podx-public-subnet"
+     }
+   }
+   ```
+
+   where 
+
+   - ```vpc_id``` is the vpc id of your pod
+   - ```cidr_block``` is the IP network you want to allocate to the subnet
+   - ```tag:Name``` is the name you want to give to the subnet
+
+   The resulting file looks like 
+
+   ```console
+   #Configure aws provider
+   provider "aws" {
+     region = "us-east-1"
+     access_key = "REDACTED"
+     secret_key = "REDACTED"
+   }
+
+   #Create a subnet
+   resource "aws_subnet" "this" {
+     vpc_id     = "vpc-REDACTED"
+     cidr_block = "192.168.1.0/24"
+
+     tags = {
+       Name = "podx-public-subnet"
+     }
+   }
+   ```
+
+5. terraform init
+
+   In a terminal, go into the folder where you created main.tf and run the terraform init command:
+
+   ```bash
+   terraform init
+   ```
+
+   You should see a result like this:
+
+   ```console
+   Initializing the backend...
+
+   Initializing provider plugins...
+   - Finding latest version of hashicorp/tls...
+   - Finding latest version of hashicorp/local...
+   - Finding latest version of hashicorp/aws...
+   - Finding latest version of hashicorp/random...
+   ...
+   Terraform has been successfully initialized!
+
+   You may now begin working with Terraform. Try running "terraform plan" to see
+   any changes that are required for your infrastructure. All Terraform commands
+   should now work.
+
+   If you ever set or change modules or backend configuration for Terraform,
+   rerun this command to reinitialize your working directory. If you forget, other
+   commands will detect it and remind you to do so if necessary.
+   ```
+
+   The ```terraform``` binary contains the basic functionality for Terraform, but it does not come with the code for any of the providers (e.g., the AWS provider, Azure provider, GCP provider, etc.), so when you’re first starting to use Terraform, you need to run ```terraform init``` to tell Terraform to scan the code, figure out which providers you’re using, and download the code for them. By default, the provider code will be downloaded into a ```.terraform``` folder, which is Terraform’s scratch directory (you may want to add it to .gitignore). Terraform will also record information about the provider code it downloaded into a ```.terraform.lock.hcl``` file.  Just be aware that you need to run init any time you start with new Terraform code, and that it’s safe to run init multiple times (the command is idempotent).
+
+6. terraform plan 
+
+   Now that you have the provider code downloaded, run the terraform plan command:
+
+   ```bash
+   terraform plan
+   ```
+
+   You should see a similar output:
+
+   ```console
+   Terraform used the selected providers to generate the following execution plan. Resource actions are indicated with the following
+   symbols:
+     + create
+
+   Terraform will perform the following actions:
+
+     # aws_subnet.this will be created
+     + resource "aws_subnet" "this" {
+         + arn                                            = (known after apply)
+         + assign_ipv6_address_on_creation                = false
+         + availability_zone                              = (known after apply)
+         + availability_zone_id                           = (known after apply)
+         + cidr_block                                     = "192.168.1.0/24"
+         + enable_dns64                                   = false
+         + enable_resource_name_dns_a_record_on_launch    = false
+         + enable_resource_name_dns_aaaa_record_on_launch = false
+         + id                                             = (known after apply)
+         + ipv6_cidr_block_association_id                 = (known after apply)
+         + ipv6_native                                    = false
+         + map_public_ip_on_launch                        = false
+         + owner_id                                       = (known after apply)
+         + private_dns_hostname_type_on_launch            = (known after apply)
+         + tags                                           = {
+             + "Name" = "podx-public-subnet"
+           }
+         + tags_all                                       = {
+             + "Name" = "podx-public-subnet"
+           }
+         + vpc_id                                         = "vpc-REDACTED"
+       }
+
+   Plan: 1 to add, 0 to change, 0 to destroy.
+
+   ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+   Note: You didn't use the -out option to save this plan, so Terraform can't guarantee to take exactly these actions if you run
+   "terraform apply" now.
+   ```
+
+   The ```plan``` command lets you see what Terraform will do before actually making any changes. This is a great way to sanity check your code before unleashing it onto the world. The output of the plan command is similar to the output of the ```diff``` command that is part of Unix, Linux, and git: anything with a plus sign ```(+)``` will be created, anything with a minus sign ```(–)``` will be deleted, and anything with a tilde sign ```(~)``` will be modified in place. In the preceding output, you can see that Terraform is planning on creating an AWS subnet and nothing else, which is exactly what you want.
+
+7. terraform apply
+
+   To actually create the subnet, run the terraform apply command:
+
+   ```bash
+   terraform apply
+   ```
+
+   You should get a similar output:
+
+   ```console
+   Terraform used the selected providers to generate the following execution plan. Resource actions are indicated with the following
+   symbols:
+     + create
+
+   Terraform will perform the following actions:
+
+     # aws_subnet.this will be created
+     + resource "aws_subnet" "this" {
+         + arn                                            = (known after apply)
+         + assign_ipv6_address_on_creation                = false
+         + availability_zone                              = (known after apply)
+         + availability_zone_id                           = (known after apply)
+         + cidr_block                                     = "192.168.1.0/24"
+         + enable_dns64                                   = false
+         + enable_resource_name_dns_a_record_on_launch    = false
+         + enable_resource_name_dns_aaaa_record_on_launch = false
+         + id                                             = (known after apply)
+         + ipv6_cidr_block_association_id                 = (known after apply)
+         + ipv6_native                                    = false
+         + map_public_ip_on_launch                        = false
+         + owner_id                                       = (known after apply)
+         + private_dns_hostname_type_on_launch            = (known after apply)
+         + tags                                           = {
+             + "Name" = "podx-public-subnet"
+           }
+         + tags_all                                       = {
+             + "Name" = "podx-public-subnet"
+           }
+         + vpc_id                                         = "vpc-REDACTED"
+       }
+
+   Plan: 1 to add, 0 to change, 0 to destroy.
+
+   Do you want to perform these actions?
+     Terraform will perform the actions described above.
+     Only 'yes' will be accepted to approve.
+
+     Enter a value: 
+   ```
+
+   You’ll notice that the apply command shows you the same plan output and asks you to confirm whether you actually want to proceed with this plan. So, while plan is available as a separate command, it’s mainly useful for quick sanity checks and during code reviews, and most of the time you’ll run apply directly and review the plan output it shows you.
+
+   Type ```yes``` and hit Enter to deploy the subnet:
+
+   You should get a similar output:
+
+   ```console
+   aws_subnet.this: Creating...
+   aws_subnet.this: Creation complete after 1s [id=subnet-026552bf9f58e52f9]
+
+   Apply complete! Resources: 1 added, 0 changed, 0 destroyed.
+   ```
+
+   Congrats, you’ve just deployed a subnet in your AWS account using Terraform! To verify this, head over to the AWS console; and you should see something similar to:
+
+   ![](docs/terraform-create-subnet.png)
+
+8. terraform state
+
+  You can notice a file named terraform.tfstate in the folder from where you run the terraform script. Terraform maintain the state of the configuration in that file, meaning that if you delete the subnet from the AWS console, you will have a mismatch between the configuration intent specified in the terraform.tfstate file and what is really configured on AWS. 
+
+  From AWS console delete the public subnet terraform has just deployed.
+
+   ![](docs/terraform-delete-subnet.png)
+
+   If you plan a Terraform deployment again you will notice Terraform can detect the changes.
+
+   ```console
+   terraform plan
+   ```
+
+   You should have an equivalent statement:
+
+   ```console
+   terraform plan
+   aws_subnet.this: Refreshing state... [id=subnet-0175beaefea607f8f]
+
+   Note: Objects have changed outside of Terraform
+
+   Terraform detected the following changes made outside of Terraform since the last "terraform apply":
+   ...
+   ```
+
+   It tells you what has been deleted and what will be deployed if the terraform plan is applied. Let's apply the deployment again:
+
+   ```console
+   terraform apply
+   ```
+
+   and input ```yes``` when asked, and check the subnet is created on the AWS console.
+
+9. terraform show
+
+   When you run ```terraform show``` you can inspect the configuration state as it is stored by Terraform. You should have something similar to:
+
+   ```console
+   terraform show
+   # aws_subnet.this:
+   resource "aws_subnet" "this" {
+       arn                                            = "arn:aws:ec2:us-east-1:REDACTED:subnet/subnet-05a8e65d3872e6c1a"
+       assign_ipv6_address_on_creation                = false
+       availability_zone                              = "us-east-1f"
+       availability_zone_id                           = "use1-az5"
+       cidr_block                                     = "192.168.1.0/24"
+       enable_dns64                                   = false
+       enable_resource_name_dns_a_record_on_launch    = false
+       enable_resource_name_dns_aaaa_record_on_launch = false
+       id                                             = "subnet-05a8e65d3872e6c1a"
+       ipv6_native                                    = false
+       map_customer_owned_ip_on_launch                = false
+       map_public_ip_on_launch                        = false
+       owner_id                                       = "REDACTED"
+       private_dns_hostname_type_on_launch            = "ip-name"
+       tags                                           = {
+           "Name" = "pod9-public-subnet"
+       }
+       tags_all                                       = {
+           "Name" = "pod9-public-subnet"
+       }
+       vpc_id                                         = "vpc-REDACTED"
+   }
+   ```
+
+10. terraform destroy 
+
+    When you’re done experimenting with Terraform, either at the end of this section, or at the end of future sections, it’s a good idea to remove all of the resources you created so that AWS doesn't’t charge you for them. Because Terraform keeps track of what resources you created, cleanup is simple. All you need to do is run the destroy command:
+
+    ```bash
+    terraform destroy
+    ```
+
+    You should get a similar output:
+
+    ```console
+    aws_subnet.this: Refreshing state... [id=subnet-026552bf9f58e52f9]
+
+    Terraform used the selected providers to generate the following execution plan. Resource actions are indicated with the following
+    symbols:
+      - destroy
+
+    Terraform will perform the following actions:
+
+      # aws_subnet.this will be destroyed
+      - resource "aws_subnet" "this" {
+          - arn                                            = "arn:aws:ec2:us-east-1:REDACTED:subnet/subnet-026552bf9f58e52f9" -> null
+          - assign_ipv6_address_on_creation                = false -> null
+          - availability_zone                              = "us-east-1a" -> null
+          - availability_zone_id                           = "use1-az4" -> null
+          - cidr_block                                     = "192.168.1.0/24" -> null
+          - enable_dns64                                   = false -> null
+          - enable_resource_name_dns_a_record_on_launch    = false -> null
+          - enable_resource_name_dns_aaaa_record_on_launch = false -> null
+          - id                                             = "subnet-026552bf9f58e52f9" -> null
+          - ipv6_native                                    = false -> null
+          - map_customer_owned_ip_on_launch                = false -> null
+          - map_public_ip_on_launch                        = false -> null
+          - owner_id                                       = "374187570784" -> null
+          - private_dns_hostname_type_on_launch            = "ip-name" -> null
+          - tags                                           = {
+              - "Name" = "podx-public-subnet"
+            } -> null
+          - tags_all                                       = {
+              - "Name" = "podx-public-subnet"
+            } -> null
+          - vpc_id                                         = "vpc-REDACTED" -> null
+        }
+
+    Plan: 0 to add, 0 to change, 1 to destroy.
+
+    Do you really want to destroy all resources?
+      Terraform will destroy all your managed infrastructure, as shown above.
+      There is no undo. Only 'yes' will be accepted to confirm.
+
+      Enter a value:
+    ```
+
+    It goes without saying that you should rarely, if ever, run destroy in a production environment! There’s no “undo” for the destroy command, so Terraform gives you one final chance to review what you’re doing, showing you the list of all the resources you’re about to delete, and prompting you to confirm the deletion. If everything looks good, type ```yes``` and hit Enter; Terraform will build the dependency graph and delete all of the resources in the correct order, using as much parallelism as possible. In a minute, your AWS account should be clean again.
+
+    You should get a similar output:
+
+    ```console
+    aws_subnet.this: Destroying... [id=subnet-026552bf9f58e52f9]
+    aws_subnet.this: Destruction complete after 0s
+
+    Destroy complete! Resources: 1 destroyed.
+    ```
+
+    And you can check that there is no more subnet in the AWS Console:
+
+    ![](docs/terraform-destroy-subnet.png)
+
+---
+
+## Let's use variables in Terraform
+
+copy your current ```main.tf``` script in another folder named ```create-subnet-with-variables```
+
+11. Create Terraform variables
+
+    Input variables let you customize aspects of Terraform modules without altering the module's own source code. This allows you to share modules across different Terraform configurations, making your module composable and reusable. 
+
+    Let's define the following variables for our script:
+
+    - region
+    - access_key
+    - secret_key
+    - vpc_id 
+    - cidr_block
+    - subnet_name
+
+    They are all of type string so it can be defined in a ```variable.tf``` definition file like this:
+
+    ```console
+    variable "region" {
+      type = string
+    }
+    variable "access_key" {
+      type = string
+    }
+    variable "secret_key" {
+      type = string
+    }
+    variable "vpc_id" {
+      type = string
+    }
+    variable "cidr_block" {
+      type = string
+    }
+    variable "subnet_name" {
+      type = string
+    }
+    ```
+    Each input variable accepted by a module must be declared using a ```variable``` block. The label after the ```variable``` keyword is a name for the variable, which must be unique among all variables in the same module. This name is used to assign a value to the variable from outside and to reference the variable's value from within the module. The name of a variable can be any valid identifier except the following: source, version, providers, count, for_each, lifecycle, depends_on, locals. These names are reserved for meta-arguments in module configuration blocks, and cannot be declared as variable names.
+
+    To set lots of variables, it is more convenient to specify their values in a variable definitions file named ```terraform.tfvars```. A variable definitions file uses the same basic syntax as Terraform language files, but consists only of variable name assignments.
+
+    ```console
+    region = "us-east-1"
+    access_key = "REDACTED"
+    secret_key = "REDACTED"
+    vpc_id = "vpc-REDACTED"
+    cidr_block = "192.168.1.0/24"
+    subnet_name = "podx-public-subnet"
+    ```
+
+12. Re-write your script with variable references
+
+    The new main.tf file is re-written to leverage the variables definition file as they are know accessible through the ```var``` prefix:
+
+    ```console
+    #Configure aws provider
+    provider "aws" {
+      region = var.region
+      access_key = var.access_key
+      secret_key = var.secret_key
+    }
+
+    #Create a subnet
+    resource "aws_subnet" "this" {
+      vpc_id     = var.vpc_id
+      cidr_block = var.cidr_block
+
+      tags = {
+        Name = var.subnet_name
+      }
+    }
+    ```
+
+    Within the module that declared a variable, its value can be accessed from within expressions as var.<NAME>, where <NAME> matches the label given in the declaration block.
+    Note: Input variables are created by a variable block, but you reference them as attributes on an object named var.
+
+13. Check the create-subnet still work
+
+    Check that the re-factored code is still working fine by exercising Terraform workflow: 1. terraform init, 2. terraform plan, 3. terraform apply and 4. terraform destroy.
+
+---
+
+## Let's use datasource and output in Terraform
+
+copy your current ```create-subnet-with-variables``` folder in another folder named ```create-subnet-with-datasource```. 
+
+Keep only the files:
+
+- ```main.tf```
+- ```variables.tf```
+- ```terraform.tfvars```
+
+You can check everything is cleaned-up in your folder with a ```tree . -all``` command. If not installed do so with ```sudo apt  install tree```
+
+```bash
+tree . -all
+.
+├── main.tf
+├── terraform.tfvars
+└── variables.tf
+```
+
+14. Add datasource to main script
+
+    Instead of defining the ```vpc_id``` as a variable we can use Terraform to read the ```aws_vpc``` resource we created manually in order to retrieve the configured object structure. Data sources allow Terraform to use information defined outside of Terraform, defined by another separate Terraform configuration, or modified by functions. A data source is accessed via a special kind of resource known as a data resource, declared using a data block
+
+    The ```main.tf``` file is modified like this:
+
+    ```console
+    #Configure aws provider
+    provider "aws" {
+      region = var.region
+      access_key = var.access_key
+      secret_key = var.secret_key
+    }
+
+    #Read vpc resource 
+    data "aws_vpc" "this" {
+      filter {
+        name   = "tag:Name"
+        values = var.vpc_name
+      }
+    }
+
+    #Create a subnet
+    resource "aws_subnet" "this" {
+      vpc_id     = data.aws_vpc.this.id
+      cidr_block = var.cidr_block
+
+      tags = {
+        Name = var.subnet_name
+      }
+    }
+
+    #Capture vpc_id in output variable
+    output "vpc_id" {
+      value = data.aws_vpc.this.id
+    }
+
+    #Capture vpc_cidr_block in output variable
+    output "vpc_cidr_block" {
+      value = data.aws_vpc.this.cidr_block
+    }
+    ```
+
+    A ```data``` block requests that Terraform read from a given data source ```("aws_vpc")``` and export the result under the given local name ```("this")```. The name is used to refer to this resource from elsewhere in the same Terraform module, but has no significance outside of the scope of a module.
+
+    The data source and name together serve as an identifier for a given resource and so must be unique within a module.
+
+    Within the block body (between ```filter { }```) are query constraints defined by the data source. Most arguments in this section depend on the data source, and indeed in this example ```tag:Name``` is the argument defined specifically for the aws_vpc data source.
+
+    When the ```aws_subnet``` resource is created, we can now refer to the ```aws_vpc``` data source to get the ```vpc_id``` configuration argument. 
+
+    Therefore note the ```vpc_id = data.aws_vpc.this.id``` in the resource configuration definition.
+
+15. Modify variables and values
+
+    As we are not using the vpc_id variable anymore but the vpc_name, it has to be defined in the ```variables.tf``` and ```terraform.tfvars``` files.
+
+    The modified files look like the following:
+
+    - variables.tf
+
+    ```console
+    variable "region" {
+      type = string
+    }
+    variable "access_key" {
+      type = string
+    }
+    variable "secret_key" {
+      type = string
+    }
+    variable "vpc_name" {
+      type = list
+    }
+    variable "cidr_block" {
+      type = string
+    }
+    variable "subnet_name" {
+      type = string
+    }
+    ```
+
+    
+    - terraform.tfvars
+
+    ```console
+    region = "us-east-1"
+    access_key = "REDACTED"
+    secret_key = "REDACTED"
+    vpc_name = ["pod2-vpc"]
+    cidr_block = "192.168.1.0/24"
+    subnet_name = "podx-public-subnet"
+    ```
+
+**Remark**. Note that the variable *vpc_name* is a "list" and not a string. This is simply due to the [AWS API](https://docs.aws.amazon.com/cli/latest/reference/ec2/describe-vpcs.html) which takes a list as arguments ("values", plural, with an S). The parameter in the '.tfvars' file is thus defined with square brackets ["pod2-vpc"], specifying a list (as in many other languages). 
+
+1.  Check the create-subnet still work
+
+    Check that the re-factored code is still working fine by exercising Terraform workflow: 1. terraform init, 2. terraform plan, 3. terraform apply and 4. terraform destroy.
+
+    Note that we are also using a new Terraform construct call ```output``` in the ```main.tf``` script. Output values make information about your infrastructure available on the command line, and can expose information for other Terraform configurations to use. Output values are similar to return values in programming languages. Each output value exported by a module must be declared using an output block. The label immediately after the output keyword is the name, which must be a valid identifier.
+
+    In our case we have defined the following outputs:
+
+    ```console
+    #Capture vpc_id in output variable
+    output "vpc_id" {
+      value = data.aws_vpc.this.id
+    }
+
+    #Capture vpc_cidr_block in output variable
+    output "vpc_cidr_block" {
+      value = data.aws_vpc.this.cidr_block
+    }
+    ```
+
+    which allow us to display the following information when applying the terraform script:
+
+    ```console
+    aws_subnet.this: Creating...
+    aws_subnet.this: Creation complete after 1s [id=subnet-01c421b0f08a51037]
+
+    Apply complete! Resources: 1 added, 0 changed, 0 destroyed.
+
+    Outputs:
+
+    vpc_cidr_block = "192.168.0.0/16"
+    vpc_id = "vpc-REDACTED"
+    ```
+
+---
+
+## Create 2x subnets
+
+17. define your script
+
+    Based on what you have seen from the previous steps, please define and test a terraform script which create two subnets like:
+
+    - subnet1:
+        - tag:Name = "podx-public-subnet"
+        - cidr_block = "192.168.1.0/24"
+    - subnet2:
+        - tag:Name = "podx-private-subnet"
+        - cidr_block = "192.168.2.0/24"
+
+    Ideally create a folder named ```create-2-subnets``` to place your script and other files.
+
+18.  test your script
+
+     Check that the code is working fine by exercising Terraform workflow: 1. terraform init, 2. terraform plan, 3. terraform apply and 4. terraform destroy. Please check on the AWS console you have achieved the right results, you should see something similar to:
+
+     ![](docs/terraform-create-2-subnets.png)
+
+---
+
+## Create a custom route table
+
+19. create your script
+
+    For this step it is asked to define a Terraform script (with associated variables definition) to create a route table with the following attributes:
+
+    - tag:Name = "podx_public_route_table"
+    - associate the route table with already provisioned ```podx-public-subnet```
+    - add a default route ```0.0.0.0/0``` via an internet gateway to be provision
+
+    We foresee you will use:
+
+    - the provider ```aws```
+    - datasource with the appropriate filters:
+        - aws_vpc
+        - aws_subnet 
+    - resource with the appropriate config arguments:
+        - aws_internet_gateway
+        - aws_route_table 
+        - aws_route_table_association
+
+    Ideally create a folder named ```create-route-table``` to place your script and other files.
+
+    To help with the exercise don't hesitate to have a look to the Terraform documentation, for example on:
+
+    - ```aws_internet_gateway```: <https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/internet_gateway>
+    - ```aws_route_table```: <https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/route_table>
+    - ```aws_route_table_association```: <https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/route_table_association>
+
+20. test your create-route-table script
+
+    Check that the code is working fine by exercising Terraform workflow: 1. terraform init, 2. terraform plan, 3. terraform apply and 4. terraform destroy. Please check on the AWS console you have achieved the right results, you should see something similar to:
+
+    ![](docs/terraform-create-route-table.png)
+
+---
+
+## Create a security group
+
+21. create your script
+
+    For this task it is asked to define a Terraform script (with associated variables definition) to create a security group with the following attributes:
+
+    - Name = "podx-ssh-security-group"
+    - an ingress rule which allows ssh for IPv4
+    - an egress rule which allows any IPv4 traffic
+
+    We foresee you will use:
+
+    - the provider ```aws```
+    - datasource with the appropriate filters:
+      - aws_vpc
+    - resource with the appropriate config arguments:
+      - aws_security_group
+
+    Ideally create a folder named ```create-security-group``` to place your script and other files.
+
+    To help with the exercise don't hesitate to have a look to the Terraform documentation, for example on:
+
+    - ```aws_security_group```: https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/security_group
+
+22.  test your script
+
+     Check that the code is working fine by exercising Terraform workflow: 1. terraform init, 2. terraform plan, 3. terraform apply and 4. terraform destroy. Please check on the AWS console you have achieved the right results, you should see something similar to:
+
+     ![](docs/terraform-create-security-group.png)
+---
+
+## Create a key pair
+
+23. create your script
+
+    For this task it is asked to define a Terraform script (with associated variables definition) to create a key pairs with the following attributes:
+
+    - Name = "podx-vm-key"
+    - algorithm = "RSA"
+    - rsa_bits  = 4096
+
+    We foresee you will use:
+
+    - the provider ```aws```
+    - resource with the appropriate config arguments:
+      - tls_private_key: to generate the RSA/4096 key 
+      - local_file: to save the content ```private_key_pem``` of the ```tls_private_key``` resource
+      - aws_key_pair: to create the key pair in AWS including the ```public_key_openssh``` of the ```tls_private_key``` resource
+
+    Ideally create a folder named ```create-key-pair``` to place your script and other files.
+
+    To help with the exercise don't hesitate to have a look to the Terraform documentation.
+
+24.  test your script
+
+     Check that the code is working fine by exercising Terraform workflow: 1. terraform init, 2. terraform plan, 3. terraform apply and 4. terraform destroy. Please check on the AWS console you have achieved the right results, you should see something similar to:
+
+     ![](docs/terraform-key-pairs.png)
+
+     Check also that the private key has been saved locally in the folder where you performed the ```terraform apply``` action with the command ```cat podx-vm-key.pem```.  
+     You should have something similar to that:
+
+     ```
+     -----BEGIN RSA PRIVATE KEY-----
+     -----END RSA PRIVATE KEY-----
+     ```
+
+---
+
+## Create an EC2 instance
+
+25. create your script
+
+    For this task it is asked to define a Terraform script (with associated variables definition) to create an EC2 instance with the following attributes:
+
+    - Name = podx-vm
+    - Image = ubuntu-focal-20.04-amd64-server-20211129
+    - Subnet = podx-public-subnet
+    - Security group = podx-ssh-security-group
+    - Instance type = t2.nano
+    - Associate public IP address = true
+    - Source Destination Check = false
+
+    We foresee you will use:
+
+    - the provider ```aws```
+    - datasource with the appropriate filters:
+      - aws_security_group selected with its ```name```
+      - aws_key_pair selected with its ```key_name```
+      - aws_subnet filtered with ```tag:Name```
+      - aws_ami selected with ```owners``` and filtered with ```tag:architecture``` and ```tag:name```
+    - resource with the appropriate config arguments:
+      - aws_instance
+
+    For convenience, you can also capture the public IP address of the instance using an output returning the value ```aws_instance.this.public_ip```
+
+    Ideally create a folder named ```create-ec2-instance``` to place your script and other files.
+
+    To help with the exercise don't hesitate to have a look to the Terraform documentation !
+
+26.  test your script
+
+     Check that the code is working fine by exercising Terraform workflow: 1. terraform init, 2. terraform plan, 3. terraform apply and 4. terraform destroy. Please check on the AWS console you have achieved the right results, you should see something similar to:
+
+     ![](docs/terraform-ec2-instance.png)
+
+     Please check also you can access via ssh the EC2 instance:
+
+     ```ssh -i podx-vm-key.pem ubuntu@34.201.76.90```
+
+     You should get access to the instance
+
+     ```console
+     Welcome to Ubuntu 20.04.3 LTS (GNU/Linux 5.11.0-1022-aws x86_64)
+
+      * Documentation:  https://help.ubuntu.com
+      * Management:     https://landscape.canonical.com
+      * Support:        https://ubuntu.com/advantage
+
+       System information as of Fri May  6 08:54:45 UTC 2022
+
+       System load:  0.0               Processes:             98
+       Usage of /:   18.4% of 7.69GB   Users logged in:       0
+       Memory usage: 42%               IPv4 address for eth0: 192.168.1.46
+       Swap usage:   0%
+
+
+     1 update can be applied immediately.
+     To see these additional updates run: apt list --upgradable
+
+
+     The list of available updates is more than a week old.
+     To check for new updates run: sudo apt update
+
+     Last login: Fri May  6 08:00:45 2022 from 86.242.114.187
+     To run a command as administrator (user "root"), use "sudo <command>".
+     See "man sudo_root" for details.
+
+     ubuntu@ip-192-168-1-46:~$ 
+     ```
+
+     Note the prompt of the instance indicating the IP address which has been allocated to the VM on the ```podx-public-subnet``` subnet.
+
+27. terraform graph
+
+    Terraform manages for you the dependency resolution, i.e. it is capable to understand which resources have to be deployed first as others depend of it, as well as deploying independent resources in parallel.
+
+    Execute ```terraform graph > digraph.dot``` to save the dependency graph of the EC2 instance deployment in ```digraph.dot``` file. You can visualize the graph with Graphviz tool, and you should have something similar to:
+
+    ![](docs/terraform-dependency-graph.png)
+
+## Questions
+
+1. Describe the difference between Terraform ```resource``` and ```datasource``` objects.
+2. Explain why Terraform is considered as a ```stateful``` provisioning tool.
+3. Please provide your ```main.tf``` and ```terraform.tfvars``` files for create-ec2-instance.
+4. From the Terraform dependency graph, please list the 5x datasource object the ```aws_instance``` object is immediately dependent on, and give the 1x resource which depends on that object.
+
+## Extra work 1 (bonus)
+
+You can try to add an DNS entry for your instance. the domain "gintonic-telecom.net" has been registered for your labs.
+You can have a look at these two terraform resources:
+- [Terrafrom AWS Data Route53 Zone](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/route53_zone)
+- [Terrafrom AWS Resource Route53 Record](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/route53_record)
+
+Once you have succeeded, you should be able to use this domain name, for instance like this:
+```ssh -i podX-key.pem ubuntu@ginX.gintonic-telecom.net```
+
+## Extra work 2 (bonus)
+
+You can try to open several instances (say 5) EC2.

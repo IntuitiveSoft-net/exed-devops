@@ -1,0 +1,444 @@
+# AWS Introduction VPC EC2 lab
+
+- [AWS Introduction VPC EC2 lab](#aws-introduction-vpc-ec2-lab)
+  - [Objectives](#objectives)
+  - [AWS Web console](#aws-web-console)
+  - [Lab Target](#lab-target)
+  - [User Management](#user-management)
+  - [Virtual Private Cloud](#virtual-private-cloud)
+    - [Create your first VPC](#create-your-first-vpc)
+    - [Create a Public and Private subnet.](#create-a-public-and-private-subnet)
+    - [WAN connectivity](#wan-connectivity)
+    - [Routing and Security.](#routing-and-security)
+  - [EC2](#ec2)
+    - [AMI](#ami)
+    - [Image types.](#image-types)
+    - [SSH Key-Pair](#ssh-key-pair)
+    - [Time to create your first VM.](#time-to-create-your-first-vm)
+  - [Bonus activity :](#bonus-activity-)
+  - [Annex](#annex)
+    - [AWS CLI on Linux](#aws-cli-on-linux)
+
+## Objectives
+
+- Get familiar with Virtual Private Cloud infrastructures AWS VPC
+- Learn VPC key networking constructs
+- Create on-demand Virtual Machines with AWS EC2
+
+---
+
+## AWS Web console
+
+Connect to the AWS console using the credentials provided in the Lab Guide.
+
+![](docs/lab_access.png)
+
+AWS Cloud infrastructure is segmented in administrative regions
+Once connected verify and switch to the lab region : us-east-1
+
+![](docs/console_region.png)
+
+The most convenient way to navigate AWS web console is to use the research bar on the top side and type the name of the service, or feature inside a service, you'd like to access.
+
+---
+
+## Lab Target
+
+![](docs/aws-lab-Lab_2_target.svg)
+
+During this lab you will learn how to create the base infrastructure for a virtual data center ready to host your applications.
+You will get familiar with AWS main constructs for Cloud Networking, Security and Compute.
+
+___ 
+
+## User Management
+
+AWS Identity and Access Management (IAM) is a web service that helps you securely control access to AWS resources. You use IAM to control who is authenticated (signed in) and authorized (has permissions) to use resources.
+IAM policies are defined as a set of permissions that grant Create Read Update Delete (CRUD) operation on any AWS resources. You can then assign policies to an IAM role.
+IAM roles are *temporary* identity a `user` or an AWS service can `assume` ( present itself as ) to gain privileges on the resources defined by the role policies.
+
+For example :
+
+The user `Gin` has the role `admin` that has the `AdministratorAccess` policy attached, it gives full operations to any resource on AWS.
+User, `Tonic` has the role `readonly` and `EC2-admin`. It has readonly rights on all AWS resources, he will need to `assume` the role `EC2-admin` if he wants to create an EC2 instance.
+
+Roles are a really handy way to restraint and control user and application access to the strict minimum AWS resources and actions. It's a key component for micro-services and cloud native/serverless application development.
+
+For example :
+
+If you create an application that will on daily basis fetch AWS logs and create a PDF report of users activity ( a random example :] ) your application will need read access to AWS log service (CloudTrail), and write access to AWS storage service (S3) to publish its report.
+
+You will then create a role named : `barad-dûr` with the policy :
+```json
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "VisualEditor0",
+            "Effect": "Allow",
+            "Action": [
+                "cloudtrail:LookupEvents",
+                "cloudtrail:GetEvents",
+                "s3:PutObject"
+            ],
+            "Resource": "*"
+        }
+    ]
+}
+```
+
+
+1. Verify the permissions of your user in IAM.
+
+Go to IAM > Users
+
+You have a dedicated AWS user but all the labs are using the same AWS Account. With great power comes great responsibility, pay attention to the IDs and Tags of the objects/constructs you create to prevent overlapping on someone else work. Please be mindful of others ;)
+
+Note that all users activities are logged in [AWS CloudTrail](https://us-east-1.console.aws.amazon.com/cloudtrail/home?region=us-east-1#/events)...
+
+
+___ 
+
+## Virtual Private Cloud
+
+![](docs/aws-lab-Lab1_target.svg)
+
+Navigate to the VPC web service.
+
+Amazon Virtual Private Cloud (Amazon VPC) enables you to launch AWS resources into a virtual network that you've defined. This virtual network closely resembles a traditional network that you'd operate in your own data center, with the benefits of using the scalable infrastructure of AWS. Unless configured otherwise, every VPC is isolated from each other with no resource overlapping and connectivity.
+
+[AWS documentation : Amazon VPC](https://docs.aws.amazon.com/vpc/latest/userguide/what-is-amazon-vpc.html)
+
+### Create your first VPC
+
+This lab is meant to be didactic, AWS offers configuration abstraction GUI wizards to help you automate creation of resources. For the purpose of this lab you will manually create each VPC objects.
+
+2. Launch AWS VPC wizard
+
+Create a **`VPC Only`** VPC. Do not forget to give it a distinctive name and feel free to add some tags that could be useful to filter your resources later on like a `lab-id` with a unique identifier for all the resources you are going to create during the lab.
+
+![](docs/aws_vpc_create.png)
+VPC Overview
+
+Congrats you have a virtual DataCenter with a dummy router connected to nothing !!! Take some time to inspect your VPC and the objects created by AWS automatically.
+
+- DHCP options set : DHCP options for the resources requesting IP addresses.
+- Main routing table : a dummy router. If not specify differently subnetS will be associated with that routing table by default.
+- Main network ACL : a dummy Firewall.
+
+[AWS documentation : Custom Route Tables](https://docs.aws.amazon.com/vpc/latest/userguide/VPC_Route_Tables.html#CustomRouteTables)
+
+AWS only applied a `tag` to the main element - the VPC - you can manually add the `lab-id` tag and a `name` to those resources to make it easier to find them later on.
+
+**Question 1 (lab report).** Provide your `tag` and `lab-id` that you used and show that it is associated to your instances.
+
+**Question 1 (lab report).** Provide your `tag` and `lab-id` that you used and show that it is associated to your instances. 
+
+Note : When looking at a list of objects in AWS console you can always filter the resources by `id` or `tags` key/value:
+
+![](docs/tags_details.png)
+
+
+### Create a Public and Private subnet.
+
+The notion of private and public subnet in AWS is similar to the traditional datacenter design with a DMZ and a private infrastructure.
+Resources on a DMZ can have a public IPv4 address or can be publicly reached from internet using predefined static NAT entry in conjunction of firewall rules.
+On the other side, resources on a private network should not be reachable from internet and can only access internet via a router performing dynamic NAPT (Network And Port Translation). This is enforced by firewall rules.
+
+On a classical - and may be outdated - three tier application, frontend, backend, database, the network connectivity should look like the following :
+- You want to serve customer on a Publicly reachable network (most likely behind a load balancer).
+- Have your backend service running a on a private network with firewall policies allowing the frontend to reach the backend. The backend could reach internet for package update, and applications download.
+- Finally your database on a dedicated network with firewall policies to allow only connections from your backend.
+
+[AWS documentation : VPCs and Subnets](https://docs.aws.amazon.com/vpc/latest/userguide/VPC_Subnets.html)
+
+[AWS documentation : VPC with Public and Private Subnets (NAT)](https://docs.aws.amazon.com/vpc/latest/userguide/VPC_Scenario2.html)
+
+In AWS a public network is a subnet associated to a routing table that have a route to an Internet Gateway (covered later on).
+
+To be able to give a network access to your EC2 instances in your VPC you need to have at least a subnet.
+
+3. In the AWS `VPC resource` create two new `subnet` from the VPC CIDR one `public` and `private`.
+
+Note : You do not have to select an Availability Zone (AZ), AWS will select one for you. AWS define an AZ as an isolated location within a Region. Each AWS datacenter in a region has several L2 switch fabrics isolated from each other. You can decide on which fabric your subnet/resources will be connected/running. For a production setup, it's a best practice to create several subnets in different AZ to prevent downtimes in case of network failure.
+
+You now have in your Virtual Data Center, two switches fabrics connected to the previously created router.
+
+You could already instantiate Virtual Machines (EC2) to your VPC but they would be confined in your Datacenter as they are not connected to the WAN.
+
+### WAN connectivity
+
+For your VM to have a WAN access you must specify the type of connections : 
+
+**NAT Gateway (v4) Egress Only Internet Gateway (IPv6)** : The construct to build a private network with Internet access.
+
+It's the classical NAT construct. You need to create a NAT Gateway and _pay_ a Public IPv4 address per availability zones you are using. The gateway will do the network/port translation of your VMs towards internet but prevent any incoming connections.
+
+**Internet Gateway (IGW)** : The construct to build a DMZ.
+
+This is the historical construct of AWS, VMs used to be publicly available. 
+Only one can be allocated per VPC and it's available across AZ.
+Technically speaking the Internet GW is doing 1:1 NAT for your instances. At provisioning time AWS allocates a Public IPv4 address for your instance and keeps a <Public IPv4>:<Private IP> translation. The public IPv4 address is allocated but not assigned to your instance, AWS can re-allocate another IP if your reboot your VM. You could also buy a static public IP from AWS if needed [AWS Documentation : Elastic IP](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/elastic-ip-addresses-eip.html). 
+
+If a subnet has a routing table entry to the Internet gateway it's referred as a `public network`.
+
+1. Add an Internet Gateway in your VPC
+
+Note : Do not forget add `name` and custom `tags`
+
+After you created an IGW check that its state is `detached`. Fix that !
+
+![](docs/igw_attach.png)
+ 
+
+
+### Routing and Security.
+
+5. Create a new `route table` attached to public subnet
+
+Update the new `route table` of your VPC to route traffic to internet.
+
+Network security is a mandatory requirement of any application/data center design. AWS offers two main constructs to enforce network security : `security groups` and `ACL`
+They both implement the same logic : port/protocol/IP restriction at a different level.
+
+`ACL` : defines rules in between subnets.
+
+`port-security`: defines rules at the VM or container level.
+
+![](docs/aws-lab-security-acl.svg)
+
+It's a mandatory construct when you want to host - the next unicorn startup - a web service, but it's also quite handy when you want to SSH your VM without having to rely on a VPN or SSH Bastion.
+
+6. Create a `VPC security group` to allow SSH connection from Internet.
+
+Note: Note carefully your `vpc-id` (ex: `vpc-0cc3b79dafe26e572`) before creating the resource: depending the version of AWS WebUI you are using, the VPC field might not be in the dropdown list.
+
+
+**Question 2 (lab report).** Provide a specificatin of your security group.   
+
+---
+
+## EC2
+
+Amazon Elastic Compute Cloud (Amazon EC2) provides scalable computing capacity in the Amazon Web Services (AWS) Cloud. In practice it's a Web service that will instantiate Virtual Machines. Historically, VM are running on a custom Xen Hypervisor. Since 2017 AWS is using a custom version of KVM called [Nitro](https://aws.amazon.com/fr/ec2/nitro/) to support/optimize performances on a wider range of hardware.
+
+An EC2 instance is principally defined by two main attributes an image/software definition called an `AMI` and a server/hardware specification called an `Image type`.
+
+The final pricing of an EC2 instance is mainly driven by the sum of :
+- The EC2 instance Image Type price-hour
+- The persistent storage used per GB-month
+- The volume of network data per GB-month
+
+[AWS Documentation : Amazon EC2](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/concepts.html)
+
+### AMI
+
+An Amazon Machine Image (AMI) is the snapshot of the VM you want to use.
+
+For example `Ubuntu 22.04` is `ami-09d56f8956ab235b3` on `us-east-1`.
+
+This is a JSON description of the resource :
+```bash
+aws ec2 describe-images --region us-east-1 --image-ids ami-09d56f8956ab235b3
+```
+
+```json
+{
+    "Images": [
+        {
+            "Architecture": "x86_64",
+            "CreationDate": "2022-04-21T14:55:59.000Z",
+            "ImageId": "ami-09d56f8956ab235b3",
+            "ImageLocation": "099720109477/ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-20220420",
+            "ImageType": "machine",
+            "Public": true,
+            "OwnerId": "REDACTED",
+            "PlatformDetails": "Linux/UNIX",
+            "UsageOperation": "RunInstances",
+            "State": "available",
+            "BlockDeviceMappings": [
+                {
+                    "DeviceName": "/dev/sda1",
+                    "Ebs": {
+                        "DeleteOnTermination": true,
+                        "SnapshotId": "snap-0d4f9d44221c0dedb",
+                        "VolumeSize": 8,
+                        "VolumeType": "gp2",
+                        "Encrypted": false
+                    }
+                },
+                {
+                    "DeviceName": "/dev/sdb",
+                    "VirtualName": "ephemeral0"
+                },
+                {
+                    "DeviceName": "/dev/sdc",
+                    "VirtualName": "ephemeral1"
+                }
+            ],
+            "Description": "Canonical, Ubuntu, 22.04 LTS, amd64 jammy image build on 2022-04-20",
+            "EnaSupport": true,
+            "Hypervisor": "xen",
+            "Name": "ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-20220420",
+            "RootDeviceName": "/dev/sda1",
+            "RootDeviceType": "ebs",
+            "SriovNetSupport": "simple",
+            "VirtualizationType": "hvm",
+            "DeprecationTime": "2024-04-21T14:55:59.000Z"
+        }
+    ]
+}
+```
+
+When creating an EC2 instance you can browse the catalogue of Public AMI created by AWS, vendors, and the community. You can also create your own AMI and export them to AWS.
+
+Note that the opensource tool [Hashicorp Packer](https://www.packer.io/plugins/builders/amazon) can be helpful to create/automate such resources.
+
+### Image types.
+
+For each application need there's a different Image type available in AWS. Databases tends to favor Memory optimized instances while AI/ML application will required an Instance with accelerated NVIDIA GPU.
+
+Image types define the number of vCPU, memory, instance storage and bandwidth allocated to your EC2 instasnce. 
+
+[AWS Documentation : Full list of EC2 instance types](https://aws.amazon.com/ec2/instance-types/)
+
+Each image type has a cost per hour (or per second for burst applications) associated that vary depending the region.
+
+[AWS Documentation : Price per EC2 Image types](https://aws.amazon.com/ec2/pricing/on-demand/)
+
+For the purpose of the lab we recommend the usage of the generic, and perfectly balanced as all the things should be, **`t2` instances**.
+
+### SSH Key-Pair
+
+Before creating your first EC2 instance lets create the last requirement : a SSH key-pair.
+On AWS, by default, you cannot access your compute instance using username and password: You need an SSH Key pair. You have the option to create one on AWS or to import yours. For linux instances, AWS will add a pub entry in `~/.ssh/authorized_keys`. If you create your own key you can create a `RSA` or `ED25519` key in `.pem` format. 
+
+1. From AWS EC2 service create or import a new SSH-Key.
+
+This is up to you to decide how many key-pairs you want to create. **You can only download a created key-pair once from AWS** (so please store the key safely in your personnal folder).
+A single key-pair can be assigned to a EC2 instance at boot time, but noting prevents you to add more keys afterwards. 
+
+
+
+Note that, if needed, you can generate public key from an AWS .pem key using the following syntax :
+```
+ssh-keygen -y -f key.pem > key.pub
+```
+
+### Time to create your first VM.
+
+8. From EC2 service select `Instances` then `Launch instances` wizard.
+
+9. Take the time to browse the AMI catalogue
+
+Note : AWS Linux 2, is based on RedHat Enterprise Linux. It comes with long-term support from Amazon and have handy packages to interact with AWS.
+For the purpose of the lab we recommend to use `ubuntu 22.04`as linux distribution, but feel free to try something else.
+
+10. Take the time to browse the Instance types and check the associated cost.
+
+11. Edit the Network settings and select your VPC, Public Subnet and Security group previously created.
+    And enable the public IP addressing for AWS to allocate a temporary public IP to your VM.
+
+Once your instance is booted you can retrieve its public IP address from the instance list try to connect to it using SSH from your instance.
+
+
+**Question 3.** Provide the IP address of your EC2 instance and show that you can run 'apt update' on this virtual machine.
+
+
+
+**Question 3.** Provide the IP address of your EC2 instance and show that you can run 'apt update' on this virtual machine. 
+
+
+___ 
+
+## Bonus activity :
+
+12. Create a new EC2 instance with no internet access, called 'pod-<id>-private'. Find a way to have a SSH connection to the private instance from your laptop/VSCode-Server.
+
+This concludes the AWS VPC EC2 lab.
+
+**Question 3.** Provide the IP address of your EC2 instance and show that you can ssh to this new instance.
+
+**Question 3.** Provide the IP address of your EC2 instance and show that you can ssh to this new instance.
+
+___ 
+
+## Annex
+
+### AWS CLI on Linux
+
+The AWS Command Line Interface (AWS CLI) is an open source tool that enables you to interact with AWS services using commands in your command-line shell. With minimal configuration, the AWS CLI enables you to start running commands that implement functionality equivalent to that provided by the browser-based AWS Management Console from the command prompt in your terminal program. Terraform will use the configuration file of the AWS CLI to retrieve the access key when performing calls to AWS API.
+
+1. Install AWS CLI
+
+```bash
+sudo apt install unzip
+```
+
+```bash
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+```
+
+```bash
+unzip awscliv2.zip
+```
+
+```bash
+sudo ./aws/install
+```
+
+2. Test you AWS CLI installation
+
+```bash
+aws --version
+```
+
+You should have a result similar to:
+
+```bash
+aws-cli/2.6.2 Python/3.9.11 Linux/5.11.0-1022-aws exe/x86_64.ubuntu.20 prompt/off
+```
+
+3. Configure the CLI
+
+Go to IAM service > Users > podx-gin-208 > Security Credentials
+
+![](docs/iam-security-credentials.png)
+
+Download or copy paste the the Secret Key it will be displayed only once.
+
+```bash
+aws configure
+```
+```
+AWS Access Key ID [None]: REDACTED
+AWS Secret Access Key [None]: REDACTED
+Default region name [None]: us-west-1
+Default output format [None]: json
+```
+
+You can test the AWS CLI.
+
+[AWS Documentation : AWS CLI usage](https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-using.html)
+```bash
+aws ec2 describe-vpcs --filters Name=tag:lab-id,Values=pod1 
+```
+Example output
+```json
+{
+  "Vpcs": [
+    {
+      "CidrBlock": "192.168.0.0/16",
+      "DhcpOptionsId": "dopt-02cb9007f1d29d0fc",
+      "State": "available",
+      "VpcId": "vpc-REDACTED",
+      "OwnerId": "REDACTED",
+      "InstanceTenancy": "default",
+      "CidrBlockAssociationSet": [
+        {
+          "AssociationId": "vpc-cidr-assoc-0e933f3263a8b89b7",
+          "CidrBlock": "192.168.0.0/16",
+          "CidrBlockState": {
+            "State": "associated"
+        [...]
+```

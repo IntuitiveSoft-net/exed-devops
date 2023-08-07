@@ -1,0 +1,5 @@
+region = "us-east-1"
+access_key = "REDACTED"
+secret_key = "REDACTED"
+ec2_name = "podx-vm"
+ssh_config_file_path = "/Users/pnivaggi/.ssh/gin"

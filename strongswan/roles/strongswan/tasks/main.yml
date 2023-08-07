@@ -1,0 +1,112 @@
+---
+# Tasks to install and configure strongSwan
+
+- name: Install strongSwan 
+  apt: pkg=strongswan state=present
+
+- name: Configure ipsec.conf 
+  template: src=ipsec.conf.j2 dest={{ strongswan_base }}/ipsec.conf owner=root group=root mode=0644
+  notify: restart ipsec
+
+- name: Configure ipsec.secrets
+  template: src=ipsec.secrets.j2 dest={{ strongswan_base }}/ipsec.secrets owner=root group=root mode=0600
+  notify: restart ipsec
+
+- name: Enable Forwarding (1/2)
+  ansible.builtin.command:
+    cmd: sudo sysctl -w net.ipv4.ip_forward=1
+  ignore_errors: yes
+- name: Enable Forwarding (2/2)
+  ansible.builtin.command:
+    cmd: sudo sysctl -p
+  ignore_errors: yes
+- name: Configure Strongswan/Charon 
+  ansible.builtin.command:
+    cmd: sudo sed -i "s/# install_routes = yes/install_routes = no/g" /etc/strongswan.d/charon.conf
+  ignore_errors: yes
+
+- name: Configure Tunnel1 vti interface
+  ansible.builtin.command:
+    cmd: sudo ip link add Tunnel1 type vti local {{ansible_host}} remote {{ tunnel1_address }} key 100
+  ignore_errors: yes
+
+- name: Configure Tunnel1 ip addresses
+  ansible.builtin.command:
+    cmd: sudo ip addr add {{ tunnel1_cgw_inside_address }} remote {{ tunnel1_vgw_inside_address }} dev Tunnel1
+  ignore_errors: yes
+
+- name: Configure Tunnel1 mtu
+  ansible.builtin.command:
+    cmd: sudo ip link set Tunnel1 up mtu 1419
+  ignore_errors: yes
+
+- name: Configure route through Tunnel1
+  ansible.builtin.command:
+    cmd: sudo ip route add {{ vpc_cidr }} dev Tunnel1 metric 100
+  ignore_errors: yes
+
+- name: Configure Tunnel2 vti interface 
+  ansible.builtin.command:
+    cmd: sudo ip link add Tunnel2 type vti local {{ ansible_host}} remote {{ tunnel2_address }} key 200
+  ignore_errors: yes
+ 
+- name: Configure Tunnel2 ip addresses
+  ansible.builtin.command:
+    cmd: sudo ip addr add {{ tunnel2_cgw_inside_address }} remote {{ tunnel2_vgw_inside_address }} dev Tunnel2
+  ignore_errors: yes
+
+- name: Configure Tunnel2 mtu
+  ansible.builtin.command:
+    cmd: sudo ip link set Tunnel2 up mtu 1419
+  ignore_errors: yes
+
+- name: Configure route through Tunnel2
+  ansible.builtin.command:
+    cmd: sudo ip route add {{ vpc_cidr }} dev Tunnel2 metric 200
+  ignore_errors: yes
+
+- name: Configure IP Tables (1/4)
+  ansible.builtin.command:
+    cmd: sudo iptables -t mangle -A FORWARD -o Tunnel1 -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
+  ignore_errors: yes
+- name: Configure IP Tables (2/4)
+  ansible.builtin.command:
+    cmd: sudo iptables -t mangle -A FORWARD -o Tunnel2 -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
+  ignore_errors: yes
+- name: Configure IP Tables (3/4)
+  ansible.builtin.command:
+    cmd: sudo iptables -t mangle -A INPUT -p esp -s {{ tunnel1_address }} -d {{ansible_host}} -j MARK --set-xmark 100
+  ignore_errors: yes
+- name: Configure IP Tables (4/4)
+  ansible.builtin.command:
+    cmd: sudo iptables -t mangle -A INPUT -p esp -s {{ tunnel2_address }} -d {{ansible_host}} -j MARK --set-xmark 200
+  ignore_errors: yes
+
+- name: Tuning Sysctl (1/7)
+  ansible.builtin.command:
+    cmd: sudo sysctl -w net.ipv4.conf.Tunnel1.rp_filter=2
+  ignore_errors: yes
+- name: Tuning Sysctl (2/7)
+  ansible.builtin.command:
+    cmd: sudo sysctl -w net.ipv4.conf.Tunnel1.disable_policy=1
+  ignore_errors: yes
+- name: Tuning Sysctl (3/7)
+  ansible.builtin.command:
+    cmd: sudo sysctl -w net.ipv4.conf.Tunne2.rp_filter=2
+  ignore_errors: yes
+- name: Tuning Sysctl (4/7)
+  ansible.builtin.command:
+    cmd: sudo sysctl -w net.ipv4.conf.Tunnel2.disable_policy=1
+  ignore_errors: yes
+- name: Tuning Sysctl (5/7)
+  ansible.builtin.command:
+    cmd: sudo sysctl -w net.ipv4.conf.{{ main_interface }}.disable_xfrm=1
+  ignore_errors: yes
+- name: Tuning Sysctl (6/7)
+  ansible.builtin.command:
+    cmd: sudo sysctl -w net.ipv4.conf.{{ main_interface }}.disable_policy=1
+  ignore_errors: yes
+- name: Tuning Sysctl (7/7)
+  ansible.builtin.command:
+    cmd: sudo sysctl -p
+  ignore_errors: yes

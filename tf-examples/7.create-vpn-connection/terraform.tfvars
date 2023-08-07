@@ -1,0 +1,13 @@
+customer_gateway_ip = "137.194.211.141"
+vpc_name = "podx-vpc"
+pod = "podx"
+access_key = "REDACTED"
+secret_key = "REDACTED"
+region = "us-east-1"
+customer_gateway_asn = "65000"
+customer_gateway_type = "ipsec.1"
+vpn_connection_type = "ipsec.1"
+vpn_connection_destination = "10.10.1.0/24"
+rt_name="podx-public-route-table"
+ansible_vars_file = "./variables.yml"
+

@@ -1,0 +1,10 @@
+---
+- hosts: vpn
+  user: ubuntu
+  become: yes
+  vars_files:
+    - "vars/variables.yml"
+  roles:
+  - strongswan
+
+

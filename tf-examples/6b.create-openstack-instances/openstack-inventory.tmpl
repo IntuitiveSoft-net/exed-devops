@@ -1,0 +1,7 @@
+Openstack VM
+
+| Host | WAN IP | Ports |
+| --- | --- | --- |
+%{ for host in hosts ~}
+| ${host["host"]} | ${host["public"]} | 22,500,4500 |
+%{ endfor ~}
