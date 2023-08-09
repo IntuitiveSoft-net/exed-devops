@@ -1,45 +1,30 @@
-# OVH Cloud notes
-
-## Terraform automation
-
-Projects - inherited from ovh.com (Innovation: 6b92824d75df47c381625c715c45cc11)
-Users - inherited from ovh.com (user-mfKU8btcns9M)
-openrc.sh (export OS_USERNAME, export OS_PASSWORD)
-Application Credentials - created on horizon.cloud.ovh.net (terraform-compute)
-app-cred-openrc.sh (OS_APPLICATION_CREDENTIAL_ID, OS_APPLICATION_CREDENTIAL_SECRET)
-Openstack Key Pairs - created by terraform
+# OVH Cloud overview
 
 ## OVH Cloud features
 
-- Compute
-- Storage
-- Network
-  - Private Network
-  - Load Balancer
-  - Floating IP
-  - Gateway
-  - Anti-DDoS
-  - Instance Public Traffic
-- Databases
-- Containers and Orchestration
-  - Managed Kubernetes Service
-  - Managed Private Registry
-  - Private Image Catalog
-  - Public Image Catalog
-  - Workflow Management
-  - OpenStack Orchestration
-Load Balancer for Managed Kubernetes Service
-- Data Analytics
-- AI & Machine learning
-- Project Management
-  - User and Role Management
-  - Quota and Region Management
-  - Billing Control
-- Management Interfaces
-  - Horizon
-  - Physical remote control
-  - OpenStack API
-- Price model
+OVH provides a range of cloud services to businesses and individuals. They are known for their focus on providing a high-performance, reliable, and cost-effective cloud infrastructure. OVH's cloud architecture and services include:
+
+- Public Cloud: OVH offers a public cloud platform that includes virtual machines (instances) with various configurations, allowing customers to run applications, websites, and other workloads. These instances can be provisioned quickly and come with options for different computing power, memory, and storage capacities.
+
+- Private Cloud: OVH provides a private cloud solution that enables businesses to create their own isolated cloud environment on OVH's infrastructure. This is suitable for organizations that require more control and customization over their cloud resources.
+
+- Object Storage: OVH offers scalable and redundant object storage services similar to Amazon S3. This allows users to store and retrieve large amounts of unstructured data, such as images, videos, backups, and logs.
+
+- Block Storage: OVH's block storage services enable users to attach additional storage volumes to their virtual machines. This is useful for expanding storage capacity without having to resize the entire instance.
+
+- Load Balancing: OVH provides load balancing solutions to distribute incoming network traffic across multiple instances or resources, ensuring high availability and better performance.
+
+- Networking: OVH's network services include features like Virtual Private Cloud (VPC) for isolating and connecting resources securely, IP failover for high availability, and DDoS protection to mitigate distributed denial-of-service attacks.
+
+- Managed Kubernetes: OVH offers a managed Kubernetes service that allows users to deploy, manage, and scale containerized applications using Kubernetes orchestration.
+
+- Database Services: OVH provides managed database services, including options for MySQL, PostgreSQL, and NoSQL databases, making it easier for users to set up and operate databases without managing the underlying infrastructure.
+
+- Monitoring and Analytics: OVH offers monitoring and analytics tools to help users monitor the performance of their applications and infrastructure, making it easier to identify and resolve issues.
+
+- Security Services: OVH emphasizes security and offers services like firewalling, VPNs, and anti-DDoS protection to safeguard cloud resources from cyber threats.
+
+- Backup and Disaster Recovery: OVH provides backup and disaster recovery solutions, allowing users to schedule backups of their data and applications and quickly restore them in case of data loss or system failures.
 
 ## Public Cloud Networking
 
