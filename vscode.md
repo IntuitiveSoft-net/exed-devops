@@ -4,7 +4,7 @@
 
 A Visual Studio Code server is available and accessible with the credentials and connection details provided in your lab access document :
 
-![](docs/vscode_access.png)
+![](images/vscode_access.png)
 
 Note : Chrome is recommended as the browser to unsure a better user experience.
 
@@ -16,7 +16,7 @@ During your lab you might want to use :
 * **File explorer** : The main panel this where you can edit/open remote files and terminals
 * **Extensions manager** : The panel where you can install new vscode extensions.
 
-![](docs/code_server_init.png)
+![](images/code_server_init.png)
 
 The principal extensions used is SSHFS, it allows you to connect to remote VM using SSH and presents their filesystem in a graphical way.
 
@@ -25,7 +25,7 @@ You can browse `vm1` filesystem and open / edit files.
 
 SSHFS extension does not provide automatic refresh, if files are created/modified directly on the target `vm1` they might not appears in the explorer. Press the `refresh` button to re-sync the remote SSHFS connection.
 
-![](docs/code_server_files.png)
+![](images/code_server_files.png)
 
 
 During your lab activity you might need to use command line interface to a remote host to execute commands.
@@ -35,7 +35,7 @@ You open a new terminal interface by :
 2. Select `Open remote SSH Terminal`
 3. Interact with terminal in the bottom pannel.
 
-![](docs/code_server_openterminal.png)
+![](images/code_server_openterminal.png)
 
 Note : You can have several terminals opened to the same host.
 
@@ -58,7 +58,7 @@ To add the lab VMs we recommend usage of vscode native feature `remote explorer`
 
 Retrieve .pem and details of your VM in lab guide:
 
-![](docs/lab_details_remote_vm.png)
+![](images/lab_details_remote_vm.png)
 
 Add a new SSH target host in vscode.
 1. Navigate to `Remote Explorer` panel
@@ -67,14 +67,14 @@ Add a new SSH target host in vscode.
    * ```console
      ssh -i ~/.ssh/pod-key.pem ubunutu@vm1.pod15.gin-208.intuitivesoft.cloud
      ```
-![](docs/vscode_local_add_host.png)
+![](images/vscode_local_add_host.png)
 
 Once added connect to the SSH target host.
 
 1. Right click the host
 2. Select Connect to the Host in current Window
 
-![](docs/vscode_local_connect_to_host.png)
+![](images/vscode_local_connect_to_host.png)
 
 Once connected to the host you can open a workspace in the remote machine.
 1. open the `File Explorer` panel
@@ -82,11 +82,11 @@ Once connected to the host you can open a workspace in the remote machine.
 3. Choose `/home/ubuntu`
 4. Click `ok`
 
-![](docs/vscode_local_open_workspace.png)
+![](images/vscode_local_open_workspace.png)
 
 
 Once you are connected you can open a remote SSH conneciton to the target host using the menu.
 1. Open `Terminal` menu 
 2. Select `New Terminal`
 
-![](docs/vscode_local_open_terminal.png)
+![](images/vscode_local_open_terminal.png)
