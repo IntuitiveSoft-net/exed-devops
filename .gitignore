@@ -6,3 +6,4 @@ pdf/*.pdf
 terraform.tfstate
 terraform.tfstate.backup
 Out/*
+.$*
