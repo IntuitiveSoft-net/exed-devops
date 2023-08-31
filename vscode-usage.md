@@ -10,6 +10,20 @@ From the training instructions you will have the possibility to inject command l
 
 Note : This option is only available in `Terminal View`
 
+Alternatively you can copy the content of box using the copy feature on the box top right corner.
+
+![](images/copy-text.png)
+
+## Upload files to Lab Dashboard
+
+You can upload files to your lab instance using the device browser `Upload` :
+
+![](images/upload-file.png)
+
+Files are stored in `~/files` folder.
+
+Alternatively you can copy/paste or drag and drop files using Visual Studio Code `File Explorer`.
+
 ## Visual Studio Code
 
 From your lab environment a Visual Studio Code server is available to interact with your working VM.
