@@ -9,7 +9,7 @@ if [ -e "$output_file" ]; then
 fi
 
 # Loop through all .md files in the folder and append their content to the output file
-for file in *.md; do
+for file in 6*.md; do
   if [ "$file" != "$output_file" ]; then
     cat "$file" >> "$output_file"
     echo "" >> "$output_file"  # Add an empty line between concatenated files
