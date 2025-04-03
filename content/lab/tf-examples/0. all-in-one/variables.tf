@@ -4,11 +4,9 @@ variable "ec2_name" {
 }
 variable "subnet_cidr" {
   type = string
-  default = "192.168.10.0/24"
 }
 variable "vpc_id" {
   type = string
-  default = "vpc-REDACTED"
 }
 variable "instance_type" {
   type = string

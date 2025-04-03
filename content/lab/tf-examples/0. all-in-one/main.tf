@@ -2,7 +2,7 @@ provider "aws" {
   region = "us-east-1"
 }
 
-# Get the VPC instance (it must exist)
+# Get the VPC instance 
 data "aws_vpc" "my-vpc" {
   id = var.vpc_id
 }
